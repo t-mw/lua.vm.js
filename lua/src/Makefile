@@ -111,7 +111,7 @@ emscripten:
 		CC="$(shell em-config EMCC)" \
 		AR="$(shell em-config EMAR) rcu" \
 		RANLIB="$(shell em-config EMRANLIB)" \
-		SYSLDFLAGS="-Os \
+		SYSLDFLAGS="-O2 \
 			-s INVOKE_RUN=0 \
 			-s NO_EXIT_RUNTIME=1 \
 			-s TOTAL_MEMORY=134217728 \
