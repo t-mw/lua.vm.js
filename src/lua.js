@@ -219,14 +219,14 @@ Lua.cfuncs = {
 		L = new Lua.State(L);
 		var box = L.checkudata(1, "_PROXY_MT");
 		var id = emscripten.getValue(box, "double");
-		delete Lua.refs[getmain(L)][id];
+		Lua.refs[getmain(L)].delete(id);
 		return 0;
 	}),
 	"__index": emscripten.Runtime.addFunction(function(L){
 		L = new Lua.State(L);
 		var box = L.checkudata(1, "_PROXY_MT");
 		var id = emscripten.getValue(box, "double");
-		var ob = Lua.refs[getmain(L)][id];
+		var ob = Lua.refs[getmain(L)].get(id);
 		var k = L.lua_to_js(2);
 		try {
 			var res = ob[k];
@@ -242,7 +242,7 @@ Lua.cfuncs = {
 		L = new Lua.State(L);
 		var box = L.checkudata(1, "_PROXY_MT");
 		var id = emscripten.getValue(box, "double");
-		var ob = Lua.refs[getmain(L)][id];
+		var ob = Lua.refs[getmain(L)].get(id);
 		var k = L.lua_to_js(2);
 		if (L.isnil(3)) {
 			try {
@@ -268,7 +268,7 @@ Lua.cfuncs = {
 		L = new Lua.State(L);
 		var box = L.checkudata(1, "_PROXY_MT");
 		var id = emscripten.getValue(box, "double");
-		var ob = Lua.refs[getmain(L)][id];
+		var ob = Lua.refs[getmain(L)].get(id);
 		var top = L.gettop();
 		var thisarg = top>=2?L.lua_to_js(2):null;
 		var args = [];
@@ -289,7 +289,7 @@ Lua.cfuncs = {
 		L = new Lua.State(L);
 		var box = L.checkudata(1, "_PROXY_MT");
 		var id = emscripten.getValue(box, "double");
-		var ob = Lua.refs[getmain(L)][id];
+		var ob = Lua.refs[getmain(L)].get(id);
 		L.push(ob.length);
 		return 1;
 	}),
@@ -297,7 +297,7 @@ Lua.cfuncs = {
 		L = new Lua.State(L);
 		var box = L.checkudata(1, "_PROXY_MT");
 		var id = emscripten.getValue(box, "double");
-		var ob = Lua.refs[getmain(L)][id];
+		var ob = Lua.refs[getmain(L)].get(id);
 		L.pushstring((ob!==null && ob.toString)?ob.toString():typeof ob);
 		return 1;
 	}),
@@ -305,7 +305,7 @@ Lua.cfuncs = {
 		L = new Lua.State(L);
 		var box = L.checkudata(1, "_PROXY_MT");
 		var id = emscripten.getValue(box, "double");
-		var ob = Lua.refs[getmain(L)][id];
+		var ob = Lua.refs[getmain(L)].get(id);
 		var top = L.gettop();
 		var args = [];
 		for (var i=2; i<=top;i++) {
@@ -325,7 +325,7 @@ Lua.cfuncs = {
 	// 	L = new Lua.State(L);
 	// 	var box = L.checkudata(1, "_PROXY_MT");
 	// 	var id = emscripten.getValue(box, "double");
-	// 	var ob = Lua.refs[getmain(L)][id];
+	// 	var ob = Lua.refs[getmain(L)].get(id);
 	// 	var k = L.lua_to_js(2);
 	// 	L.pushboolean(delete ob[k]);
 	// 	return 1;
@@ -345,7 +345,7 @@ Lua.State = function (_L) {
 	} else {
 		this._L = Lua.auxlib.newstate();
 
-		var refs = [];
+		var refs = new Map();
 		refs.i = 0;
 		Lua.refs[this._L] = refs;
 
@@ -479,7 +479,7 @@ Lua.State.prototype.lua_to_js = function(i) {
 			var box = this.testudata(i, "_PROXY_MT");
 			if (box !== /* NULL */ 0) {
 				var id = emscripten.getValue(box, "double");
-				return Lua.refs[getmain(this)][id];
+				return Lua.refs[getmain(this)].get(id);
 			}
 			/* fall through */
 		default: // LUA_TTABLE, LUA_TFUNCTION, LUA_TTHREAD
@@ -488,7 +488,21 @@ Lua.State.prototype.lua_to_js = function(i) {
 };
 Lua.State.prototype.pushjs = function(ob) {
 	var refs = Lua.refs[getmain(this)];
-	var i = refs.indexOf(ob);
+
+	var iter = refs.entries();
+	var i = -1;
+	while (true) {
+		var current = iter.next();
+		if (current.done) {
+			break;
+		}
+
+		if (current.value[1] === ob) {
+			i = current.value[0];
+			break;
+		}
+	}
+
 	if (i !== -1) {
 		this.getfield(Lua.defines.REGISTRYINDEX, "wrapped");
 		this.pushnumber(i);
@@ -502,7 +516,7 @@ Lua.State.prototype.pushjs = function(ob) {
 		}
 	}
 	i = refs.i++;
-	refs[i] = ob;
+	refs.set(i, ob);
 	var box = this.newuserdata(8);
 	emscripten.setValue(box, i, "double");
 	this.setmetatable("_PROXY_MT");
