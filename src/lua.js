@@ -396,11 +396,14 @@ Lua.State = function (_L) {
 // Auxiliary library takes precedence
 (function() {
 	function wrap(func) {
-		return function() {
-			var args = slice.call(arguments, 0);
-			args.splice(0, 0, this._L);
-			return func.apply(null, args);
-		};
+		return(function() {
+			var args = [this._L];
+			var l = arguments.length;
+			for (var i = 0; i < l; i++) {
+				args.push(arguments[i]);
+			}
+			return func.apply(null, args)
+		})
 	}
 	for (var i in Lua.lib) {
 		Lua.State.prototype[i] = wrap(Lua.lib[i]);
